@@ -20,7 +20,7 @@ Adafruit_LEDBackpack matrix = Adafruit_LEDBackpack();
 //each chord is expressed like in this array: [2, 3, 4, 0]
 //this means "pick the 2nd fret on the first string, the 3rd fret on the second string.."
 //the maximum number of the stored chords is 40 for now
-uint8_t chordSequence[40][4];
+int chordSequence[40][4];
 int chordOnDuty = 0;
 
 //variables for microphone
@@ -181,22 +181,27 @@ void parseIncomingString() {
 
     // Copy it over
     content.toCharArray(char_array_content, content.length() + 1);
-    Serial.println(content[0]);
-    Serial.println(content[1]);
 
     //------------------- showChordSeq -------------------
     if (command == "showChordSeq") {
       resetChordSequence(); //reset the array first
+      int chordIndex = 0;
+      int stringNum = 0;
 
       for (int i = 0; i < content.length() - 1; i++) {
-        int chordIndex = 0;
-        int stringNum = 0;
 
         //iterate through all characters
         if (content[i] != '[' && content[i] != ']' && content[i] != ',' && content[i] != ' ') {
           //if it is not a delimeter ('[' or ']' or ',' or ' '),
           //store it to the chord sequence array
-          chordSequence[chordIndex][stringNum] = content[i];
+          chordSequence[chordIndex][stringNum] = (int)content[i] - 48 - 1;//convert to char and subtract 1
+          //          Serial.print("chordIndex: ");
+          //          Serial.print(chordIndex);
+          //          Serial.print(", ");
+          //          Serial.print("stringNum: ");
+          //          Serial.print(stringNum);
+          //          Serial.print(", ");
+          //          Serial.println(content[i]);
 
         } else if (content[i] == ',') {
           stringNum++; //move to next string
@@ -216,93 +221,7 @@ void parseIncomingString() {
     }
 
 
-    /*
-    switch(c){
-      case 'A':
-        turnOffAllLEDs();
-        matrix.displaybuffer[2] = _BV(0);
-        matrix.displaybuffer[3] = _BV(1);
-        break;
 
-      case 'B':
-        turnOffAllLEDs();
-        matrix.displaybuffer[0] = _BV(1);
-        matrix.displaybuffer[1] = _BV(1);
-        matrix.displaybuffer[2] = _BV(2);
-        matrix.displaybuffer[3] = _BV(3);
-        break;
-
-      case 'C':
-        turnOffAllLEDs();
-        matrix.displaybuffer[0] = _BV(2);
-        break;
-
-      case 'D':
-        turnOffAllLEDs();
-        matrix.displaybuffer[1] = _BV(1);
-        matrix.displaybuffer[2] = _BV(1);
-        matrix.displaybuffer[3] = _BV(1);
-        break;
-
-      case 'E':
-        turnOffAllLEDs();
-        matrix.displaybuffer[0] = _BV(1);
-        matrix.displaybuffer[1] = _BV(3);
-        matrix.displaybuffer[2] = _BV(3);
-        matrix.displaybuffer[3] = _BV(3);
-        break;
-
-      case 'F':
-        turnOffAllLEDs();
-        matrix.displaybuffer[1] = _BV(0);
-        matrix.displaybuffer[3] = _BV(1);
-        break;
-
-      case 'G':
-        turnOffAllLEDs();
-        matrix.displaybuffer[0] = _BV(1);
-        matrix.displaybuffer[1] = _BV(2);
-        matrix.displaybuffer[2] = _BV(1);
-        break;
-
-      case '1':
-        turnOnAllLEDs();
-        break;
-
-      case '0':
-        turnOffAllLEDs();
-        break;
-
-      case '+':
-        if(!timer.isEnabled(anim_pileDown_timerId)){
-          timer.enable(anim_pileUp_timerId);
-        }
-        break;
-
-      case '-':
-        if(!timer.isEnabled(anim_pileUp_timerId)){
-          timer.enable(anim_pileDown_timerId);
-        }
-        break;
-
-      case 'r':
-        timer.enable(anim_random_timerId);
-        break;
-
-      case 'u':
-        if(!timer.isEnabled(anim_pickUp_timerId)){
-          timer.enable(anim_pickDown_timerId);
-        }
-
-      case 'd':
-        if(!timer.isEnabled(anim_pickDown_timerId)){
-          timer.enable(anim_pickUp_timerId);
-        }
-
-      //default:
-        //do nothing
-    }
-    */
 
   }
 }
@@ -312,17 +231,23 @@ void parseIncomingString() {
 void updateLEDstatus() {
 
   if (chordSequence[chordOnDuty][0] == 9) {
-      //if there is no value in the slot,
-      //bail out from this function
-      return;
+    //if there is no value in the slot,
+    resetChordSequence(); //reset the chord sequence array
+    chordOnDuty = 0; //reset the current chord index
+    turnOffAllLEDs(); //turn off all LEDs
+    return; //bail out from this function
   }
-  
-  //overwrite the values in the bitmap array
-  matrix.displaybuffer[0] = _BV(chordSequence[chordOnDuty][0]);
-  matrix.displaybuffer[1] = _BV(chordSequence[chordOnDuty][1]);
-  matrix.displaybuffer[2] = _BV(chordSequence[chordOnDuty][2]);
-  matrix.displaybuffer[3] = _BV(chordSequence[chordOnDuty][3]);
 
+  //overwrite the values in the bitmap array
+  for (int stringNum = 0; stringNum < 4; stringNum++) {
+    if (chordSequence[chordOnDuty][stringNum] == -1) {
+      //don't light up any LEDs on the string
+      matrix.displaybuffer[stringNum] = 0;
+    } else {
+      //light up one LED on the string
+      matrix.displaybuffer[stringNum] = _BV(chordSequence[chordOnDuty][stringNum]);
+    }
+  }
 }
 
 //================ turnOnAllLEDS() ================
