@@ -22,6 +22,7 @@ Adafruit_LEDBackpack matrix = Adafruit_LEDBackpack();
 //the maximum number of the stored chords is 40 for now
 int chordSequence[40][4];
 int chordOnDuty = 0;
+boolean isChordSequence = false;
 
 //variables for microphone
 const int sampleWindow = 50; // Sample window width in mS (50 mS = 20Hz)
@@ -65,7 +66,7 @@ void setup() {
 //================ loop() ================
 void loop() {
   //check the input vlotage from the attached microphone
-  if(millis() - lastTimeSampling > 500){
+  if (millis() - lastTimeSampling > 500) {
     checkMicrophone();
   }
 
@@ -76,7 +77,9 @@ void loop() {
   //checkChordSequence();
 
   //update LED status
-  updateLEDstatus();
+  if(isChordSequence){
+    updateLEDstatus();
+  }
 
   //run timer
   timer.run();
@@ -125,20 +128,20 @@ void checkMicrophone() {
   //send a signal back to the connected phone
   //to notify that the string has been picked
   if (volts > 2.0) {
-    Serial.print(">");
-    Serial.print('['); //send a signal to phone
-    Serial.print(chordSequence[chordOnDuty][0]+1);
-    Serial.print(',');
-    Serial.print(chordSequence[chordOnDuty][1]+1);
-    Serial.print(',');
-    Serial.print(chordSequence[chordOnDuty][2]+1);
-    Serial.print(',');
-    Serial.print(chordSequence[chordOnDuty][3]+1);
-    Serial.print(']');
-    
     digitalWrite(testLEDpin, HIGH);
     chordOnDuty++; //move to next chord
     lastTimeSampling = millis(); //update the time
+
+    Serial.print(">");
+    Serial.print('['); //send a signal to phone
+    Serial.print(chordSequence[chordOnDuty][0] + 1);
+    Serial.print(',');
+    Serial.print(chordSequence[chordOnDuty][1] + 1);
+    Serial.print(',');
+    Serial.print(chordSequence[chordOnDuty][2] + 1);
+    Serial.print(',');
+    Serial.print(chordSequence[chordOnDuty][3] + 1);
+    Serial.print(']');
   } else {
     digitalWrite(testLEDpin, LOW);
   }
@@ -148,6 +151,7 @@ void checkMicrophone() {
 //================ resetChordSequence() ================
 //reset all the values in the chord sequence array
 void resetChordSequence() {
+  chordOnDuty = 0;
   for (int chordIndex = 0; chordIndex < 40; chordIndex++) {
     for (int stringNum = 0; stringNum < 4; stringNum++) {
       chordSequence[chordIndex][stringNum] = 9; //set an unreal number to represent this is blank
@@ -178,17 +182,17 @@ void parseIncomingString() {
 
     //get the whole string at first
     String s = Serial.readString();
-    Serial.println(s);
+    //Serial.println(s);
 
     int firstSlashIndex = s.indexOf('/');
     String command = s.substring(0, firstSlashIndex);
     int secondSlashIndex = s.indexOf('/', firstSlashIndex + 1);
     String content = s.substring(firstSlashIndex + 1, secondSlashIndex);
 
-    Serial.print("command: ");
-    Serial.println(command);
-    Serial.print("content: ");
-    Serial.println(content);
+    //Serial.print("command: ");
+    //Serial.println(command);
+    //Serial.print("content: ");
+    //Serial.println(content);
 
     // Prepare the character array (the buffer) for the content string
     char char_array_content[content.length() + 1]; //last char is null representing end of a string
@@ -199,6 +203,7 @@ void parseIncomingString() {
     //------------------- showChordSeq -------------------
     if (command == "showChordSeq") {
       resetChordSequence(); //reset the array first
+      isChordSequence = true;
       int chordIndex = 0;
       int stringNum = 0;
 
@@ -233,6 +238,36 @@ void parseIncomingString() {
       int moveTo = content.toInt(); //convert it to int
       chordOnDuty = moveTo; //move to the index
     }
+
+    //------------------- displayAnimation -------------------
+    else if (command == "displayAnimation") {
+      String str(content);//turn it to a string object
+
+      if (content == "pileUp") {
+        if (!timer.isEnabled(anim_pileDown_timerId)) {
+          timer.enable(anim_pileUp_timerId);
+        }
+      } else if (content == "pileDown") {
+        if (!timer.isEnabled(anim_pileUp_timerId)) {
+          timer.enable(anim_pileDown_timerId);
+        }
+      } else if (content == "turnOnAll") {
+        turnOnAllLEDs();
+      } else if (content == "turnOffAll") {
+        turnOffAllLEDs();
+      } else if (content == "pickUp") {
+        if (!timer.isEnabled(anim_pickDown_timerId)) {
+          timer.enable(anim_pickUp_timerId);
+        }
+      } else if (content == "pickDown") {
+        if (!timer.isEnabled(anim_pickUp_timerId)) {
+          timer.enable(anim_pickDown_timerId);
+        }
+      } else if (content == "random") {
+        timer.enable(anim_random_timerId);
+      }
+
+    }
   }
 }
 
@@ -245,6 +280,7 @@ void updateLEDstatus() {
     resetChordSequence(); //reset the chord sequence array
     chordOnDuty = 0; //reset the current chord index
     turnOffAllLEDs(); //turn off all LEDs
+    isChordSequence = false;
     return; //bail out from this function
   }
 
@@ -341,7 +377,7 @@ void anim_pickDown() {
   counter++;
   if (counter > 4) {
     counter = 0;
-    timer.disable(anim_pickUp_timerId);
+    timer.disable(anim_pickDown_timerId);
     turnOffStringLEDs();
   }
 }
@@ -356,7 +392,7 @@ void anim_pickUp() {
   counter--;
   if (counter < -1) {
     counter = 3;
-    timer.disable(anim_pickDown_timerId);
+    timer.disable(anim_pickUp_timerId);
     turnOffStringLEDs();
   }
 }
